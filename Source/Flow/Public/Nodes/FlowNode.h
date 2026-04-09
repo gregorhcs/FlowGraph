@@ -348,7 +348,7 @@ public:
 
 #if !UE_BUILD_SHIPPING
 
-protected:
+public: // SF Mod
 	TMap<FName, TArray<FPinRecord>> InputRecords;
 	TMap<FName, TArray<FPinRecord>> OutputRecords;
 #endif
