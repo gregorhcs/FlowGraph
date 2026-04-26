@@ -31,6 +31,7 @@ private:
 	FTimerHandle CompletionTimerHandle;
 	FTimerHandle StepTimerHandle;
 
+protected:
 	UPROPERTY(SaveGame)
 	float ResolvedCompletionTime;
 
@@ -43,7 +44,6 @@ private:
 	UPROPERTY(SaveGame)
 	float RemainingStepTime;
 
-protected:
 	virtual void InitializeInstance() override;
 	virtual void ExecuteInput(const FName& PinName) override;
 
