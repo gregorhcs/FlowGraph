@@ -164,23 +164,23 @@ void UFlowSubsystem::FinishAllRootFlows(UObject* Owner, const EFlowFinishPolicy 
 
 UFlowAsset* UFlowSubsystem::CreateSubFlow(UFlowNode_SubGraph* SubGraphNode, const FString& SavedInstanceName, const bool bPreloading /* = false */)
 {
-	UFlowAsset* NewInstance = nullptr;
+	UFlowAsset* AssetInstance = nullptr;
 
 	if (!InstancedSubFlows.Contains(SubGraphNode))
 	{
 		const TWeakObjectPtr<UObject> Owner = SubGraphNode->GetFlowAsset() ? SubGraphNode->GetFlowAsset()->GetOwner() : nullptr;
-		NewInstance = CreateFlowInstance(Owner, SubGraphNode->Asset.LoadSynchronous(), SavedInstanceName);
+		AssetInstance = CreateFlowInstance(Owner, SubGraphNode->Asset.LoadSynchronous(), SavedInstanceName);
 
-		if (NewInstance)
+		if (AssetInstance)
 		{
-			InstancedSubFlows.Add(SubGraphNode, NewInstance);
+			InstancedSubFlows.Add(SubGraphNode, AssetInstance);
 		}
 	}
 
 	if (InstancedSubFlows.Contains(SubGraphNode) && !bPreloading)
 	{
 		// get instanced asset from map - in case it was already instanced by calling CreateSubFlow() with bPreloading == true
-		UFlowAsset* AssetInstance = InstancedSubFlows[SubGraphNode];
+		AssetInstance = InstancedSubFlows[SubGraphNode];
 
 		AssetInstance->NodeOwningThisAssetInstance = SubGraphNode;
 		SubGraphNode->GetFlowAsset()->ActiveSubGraphs.Add(SubGraphNode, AssetInstance);
@@ -192,7 +192,7 @@ UFlowAsset* UFlowSubsystem::CreateSubFlow(UFlowNode_SubGraph* SubGraphNode, cons
 		}
 	}
 
-	return NewInstance;
+	return AssetInstance;
 }
 
 void UFlowSubsystem::RemoveSubFlow(UFlowNode_SubGraph* SubGraphNode, const EFlowFinishPolicy FinishPolicy)
@@ -400,7 +400,7 @@ void UFlowSubsystem::OnGameSaved(TArray<FFlowComponentSaveData>& FlowComponents,
 				if (FlowComponent->CanSave())
 				{
 					FlowComponent->SaveRootFlow(FlowInstances);
-				}				
+				}
 			}
 			else
 			{
@@ -423,7 +423,7 @@ void UFlowSubsystem::OnGameSaved(TArray<FFlowComponentSaveData>& FlowComponents,
 			if (RegisteredComponent->CanSave())
 			{
 				FlowComponents.Emplace(RegisteredComponent->SaveInstance());
-			}		
+			}
 		}
 	}
 }
@@ -487,7 +487,7 @@ const FFlowComponentSaveData* UFlowSubsystem::GetLoadedComponentRecord(const UFl
 	{
 		const FString WorldName = Component->GetWorld()->GetName();
 		const FString ActorName = Component->GetOwner()->GetName();
-		
+
 		for (const FFlowComponentSaveData& ComponentRecord : LoadedSaveGame->FlowComponents)
 		{
 			if (ComponentRecord.WorldName == WorldName && ComponentRecord.ActorInstanceName == ActorName)
@@ -506,7 +506,7 @@ const FFlowAssetSaveData* UFlowSubsystem::GetLoadedAssetRecord(const UObject* Ow
 	{
 		const FName& WorldName = GetWorld()->GetFName();
 		const bool bAssetBoundToWorld = Asset->IsBoundToWorld();
-		
+
 		for (const FFlowAssetSaveData& AssetRecord : LoadedSaveGame->FlowInstances)
 		{
 			if (AssetRecord.InstanceName == SavedAssetInstanceName && (!bAssetBoundToWorld || AssetRecord.WorldName == WorldName))
@@ -742,26 +742,33 @@ void UFlowSubsystem::FindComponents(const FGameplayTagContainer& Tags, const EGa
 	{
 		for (const FGameplayTag& Tag : Tags)
 		{
-			TArray<TWeakObjectPtr<UFlowComponent>> ComponentsPerTag;
-			FindComponents(Tag, bExactMatch, ComponentsPerTag);
-			OutComponents.Append(ComponentsPerTag);
+			if (Tag.IsValid())
+			{
+				TArray<TWeakObjectPtr<UFlowComponent>> ComponentsPerTag;
+				FindComponents(Tag, bExactMatch, ComponentsPerTag);
+				OutComponents.Append(ComponentsPerTag);
+			}
 		}
 	}
 	else // EGameplayContainerMatchType::All
 	{
 		TSet<TWeakObjectPtr<UFlowComponent>> ComponentsWithAnyTag;
+
+		// Seed the candidate pool using just the first valid tag, then filter down to only those that have all tags.
 		for (const FGameplayTag& Tag : Tags)
 		{
-			TArray<TWeakObjectPtr<UFlowComponent>> ComponentsPerTag;
-			FindComponents(Tag, bExactMatch, ComponentsPerTag);
-			ComponentsWithAnyTag.Append(ComponentsPerTag);
-			break;
+			if (Tag.IsValid())
+			{
+				TArray<TWeakObjectPtr<UFlowComponent>> ComponentsPerTag;
+				FindComponents(Tag, bExactMatch, ComponentsPerTag);
+				ComponentsWithAnyTag.Append(ComponentsPerTag);
+				break;
+			}
 		}
 
 		for (const TWeakObjectPtr<UFlowComponent>& Component : ComponentsWithAnyTag)
 		{
-			if (Component.IsValid() && 
-				(bExactMatch ? Component->IdentityTags.HasAllExact(Tags) : Component->IdentityTags.HasAll(Tags)))
+			if (Component.IsValid() && (bExactMatch ? Component->IdentityTags.HasAllExact(Tags) : Component->IdentityTags.HasAll(Tags)))
 			{
 				OutComponents.Emplace(Component);
 			}
